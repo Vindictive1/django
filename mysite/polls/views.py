@@ -1,55 +1,63 @@
-from django.http import HttpResponse, Http404, HttpResponseRedirect
-from django.shortcuts import render, get_object_or_404
-from django.urls import reverse
-from django.utils import timezone
-from django.views import generic
+from django.http import HttpResponse
 
-from .models import Question, Choice
+from .models import Employee
+
+from pymongo import MongoClient
 
 
-class IndexView(generic.ListView):
-    template_name = 'polls/index.html'
-    context_object_name = 'latest_question_list'
-
-    def get_queryset(self):
-        """Return the last five published questions."""
-        return Question.objects.order_by('-pub_date')[:5]
-
-
-class DetailView(generic.DetailView):
-    model = Question
-    template_name = 'polls/detail.html'
-
-    class DetailView(generic.DetailView):
-        ...
-
-        def get_queryset(self):
-            """
-            Excludes any questions that aren't published yet.
-            """
-            return Question.objects.filter(pub_date__lte=timezone.now())
+def get_db_handle(db_name, host, port, username, password):
+    client = MongoClient(host=host,
+                         port=int(port),
+                         username=username,
+                         password=password
+                         )
+    db_handle = client['db_name']
+    return db_handle, client
 
 
+my_client = MongoClient('localhost', 27017)
+# First define the database name
+dbname = my_client['sample_medicines']
 
-class ResultsView(generic.DetailView):
-    model = Question
-    template_name = 'polls/results.html'
+# Now get/create collection name (remember that you will see the database in your mongodb cluster only after you
+# create a collection)
+collection_name = dbname["medicinedetails"]
+
+# let's create two documents
+medicine_1 = {
+    "medicine_id": "RR000123456",
+    "common_name": "Paracetamol",
+    "scientific_name": "",
+    "available": "Y",
+    "category": "fever"
+}
+medicine_2 = {
+    "medicine_id": "RR000342522",
+    "common_name": "Metformin",
+    "scientific_name": "",
+    "available": "Y",
+    "category": "type 2 diabetes"
+}
+
+collection_name.insert_many([medicine_1, medicine_2])
+
+med_details = collection_name.find({})
+
+for r in med_details:
+    print(r["common_name"])
+    print(type(r))
 
 
-def vote(request, question_id):
-    question = get_object_or_404(Question, pk=question_id)
-    try:
-        selected_choice = question.choice_set.get(pk=request.POST['choice'])
-    except (KeyError, Choice.DoesNotExist):
-        # Redisplay the question voting form.
-        return render(request, 'polls/detail.html', {
-            'question': question,
-            'error_message': "You didn't select a choice.",
-        })
-    else:
-        selected_choice.votes += 1
-        selected_choice.save()
-        # Always return an HttpResponseRedirect after successfully dealing
-        # with POST data. This prevents data from being posted twice if a
-        # user hits the Back button.
-        return HttpResponseRedirect(reverse('polls:results', args=(question.id,)))
+# Create your views here.
+def index(request):
+    return HttpResponse("<h1>Hello and welcome to my first <u>Django App</u> project!</h1>")
+
+
+def get_json_data(request):
+    employees = med_details
+    import json
+    from django.core import serializers
+    json_data = serializers.serialize('json', employees)
+    json_data = json.loads(json_data)
+    from django.http import HttpResponse, JsonResponse
+    return JsonResponse(json_data, safe=False)
